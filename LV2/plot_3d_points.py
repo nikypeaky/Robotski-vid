@@ -6,7 +6,7 @@ import matplotlib.tri as mtri
 def main():
     fig = plt.figure(figsize=plt.figaspect(0.5))
 
-    points_3d_path = 'LV5/points_3d.json'
+    points_3d_path = './LV2/points_3d.json'
 
     with open(points_3d_path, 'r') as f:
         points_3d = np.array(json.load(f))
