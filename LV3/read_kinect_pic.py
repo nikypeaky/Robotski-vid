@@ -1,6 +1,87 @@
 import numpy as np
 import cv2
 import random
+import time
+import os
+from openni import openni2
+from openni import _openni2
+
+IMG_DIR = "output-images"
+
+def image_capture():
+
+    if not os.path.exists(IMG_DIR):
+    os.makedirs(IMG_DIR)
+
+    try:
+        # ZA WINDOWS: Ostavljamo prazno ili prosljeđujemo Windows putanju ako driver zapne
+        openni2.initialize("putanja") 
+        print("OpenNI2 initialized successfully!")
+    except Exception as e:
+        print(f"Failed to initialize: {e}")
+        exit()
+
+    dev = openni2.Device.open_any()
+
+    color_stream = dev.create_color_stream()
+    color_stream.set_video_mode(_openni2.OniVideoMode(
+        pixelFormat=_openni2.OniPixelFormat.ONI_PIXEL_FORMAT_RGB888, 
+        resolutionX=320, resolutionY=240, fps=30))
+    color_stream.start()
+
+    depth_stream = dev.create_depth_stream()
+    depth_stream.set_video_mode(_openni2.OniVideoMode(
+        pixelFormat=_openni2.OniPixelFormat.ONI_PIXEL_FORMAT_DEPTH_1_MM, 
+        resolutionX=320, resolutionY=240, fps=30))
+    depth_stream.start()
+
+    if dev.is_image_registration_mode_supported(openni2.IMAGE_REGISTRATION_DEPTH_TO_COLOR):
+        dev.set_image_registration_mode(openni2.IMAGE_REGISTRATION_DEPTH_TO_COLOR)
+        print("Registration (Alignment) enabled!")
+
+    dev.set_depth_color_sync_enabled(True)
+
+    print("Warming up sensors...")
+    time.sleep(3)
+    for _ in range(30):
+        color_stream.read_frame()
+        depth_stream.read_frame()
+
+    for i in range(1, 11):
+        IMG_ID = f"{i:05d}"  # Formatira broj u "00001", "00002" itd.
+        print(f"\nPriprema za sliku [{i}/10].")
+
+        while True:
+            color_frame = color_stream.read_frame()
+            depth_frame = depth_stream.read_frame()
+
+            color_data = color_frame.get_buffer_as_uint8()
+            img = np.frombuffer(color_data, dtype=np.uint8).reshape(H_res, W_res, 3)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) 
+
+            cv2.imshow("Stisni biolo šta za slikanje", img)
+            key = cv2.waitKey(1)& 0xFF
+
+            if key != 255: 
+                depth_data = depth_frame.get_buffer_as_uint16()
+                depth_array = np.frombuffer(depth_data, dtype=np.uint16).reshape(H_res, W_res)
+
+                print(f"Saving images to {IMG_DIR}...")
+
+                # 1. Spremamo kao .bmp (kako RANSAC očekuje)
+                cv2.imwrite(f"./{IMG_DIR}/sl-{IMG_ID}.bmp", img)
+
+                np.savetxt(f"./{IMG_DIR}/sl-{IMG_ID}-D.txt", depth_array, fmt='%d', delimiter=' ') 
+                print(f"Saved depth as sl-{IMG_ID}-D.txt")
+
+                break
+
+    # Gasi streamove
+    color_stream.stop()
+    depth_stream.stop()
+    openni2.unload()
+    print("Done!")
+
 
 def read_kinect_pic(depth_path, image_shape):
 
@@ -221,6 +302,8 @@ def segment_all_planes(point_3d_array, max_planes=5, iterations=1000, epsilon=3.
 
 if __name__ == "__main__":
   
+    #image_capture()
+
     rgb_path = f'./LV3/lv3-images/sl-00133.bmp'
     depth_path = f'./LV3/lv3-images/sl-00133-D.txt'
     
